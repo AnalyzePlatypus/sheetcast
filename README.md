@@ -7,6 +7,10 @@ Build a podcast feed using nothing but a Google Sheet!
 
 ## Development
 
+```
+sam local invoke RegenerateFeed --env-vars=.env.json --event=events/event.json
+```
+
 ## Appendix
 
 ### Sheet column reference

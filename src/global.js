@@ -1,3 +1,8 @@
+const AWS = require('aws-sdk');
+
+const fs  = require("fs");
+const path = require("path");
+
 async function asyncForEach(array, callback) {
   for (let index = 0; index < array.length; index++) {
     await callback(array[index], index, array);
@@ -6,7 +11,7 @@ async function asyncForEach(array, callback) {
 
 function validateEnvVars(envVars) {
   envVars.forEach(envVar => {
-    if(!process.env[envVar]) throw `Missing required env var "${envVar}"`;
+    if(!process.env[envVar]) throw `Missing required env var "${envVar}".\nIn development, is the var present in .env.json and whitelisted in template.yml?`;
   })
 }
 
@@ -77,12 +82,12 @@ async function respond(response, args, messageHash) {
 // ------
 
 
-async function uploadJsonFile({jsonFile, s3Key, s3Bucket}) {
+async function uploadFile({s3Key, bucketName, fileContents, fileMimeType, s3Bucket}) {
   var uploadRequest = {
-    Bucket: s3Bucket,
+    Bucket: bucketName,
     Key: s3Key, 
-    Body: JSON.stringify(jsonFile),
-    ContentType: 'application/json',
+    Body: fileContents,
+    ContentType: fileMimeType,
     Tagging: buildTagString({})
   };
   console.log(`🌀 Uploading file "${s3Key}"`);
@@ -99,10 +104,31 @@ function buildTagString(tagObject) {
 
 // ------
 
+const pipe = (...fns) => x => fns.reduce((y, f) => f(y), x);
+const resolveFilePath = filepath => path.resolve(process.cwd(), filepath)
+
+const readJSONFile = pipe(
+  resolveFilePath,
+  fs.readFileSync,
+  buffer => buffer.toString(),
+  JSON.parse
+)
+
+function loadEnvVars(functionName) {
+  if(!functionName) throw 'functionName is require (expected 1 argument but got undefined)'
+  const envVars = readJSONFile("../.env.json");
+  Object.entries(envVars[functionName]).forEach(([key, value])=>{
+    process.env[key] = value;
+  });
+}
+//
+
 exports.respond = respond;
 exports.asyncForEach = asyncForEach;
 exports.validateEnvVars = validateEnvVars;
 exports.sendSlackNotification = sendSlackNotification;
 exports.getCloudWatchLogDeeplink = getCloudWatchLogDeeplink;
 exports.parseBoolean = parseBoolean;
-exports.uploadJsonFile = uploadJsonFile;
+exports.uploadFile = uploadFile;
+exports.loadEnvVars = loadEnvVars;
+exports.readJSONFile = readJSONFile;
