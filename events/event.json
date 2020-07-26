@@ -1,0 +1,10 @@
+{
+  "body":  "",
+  "resource": "/{proxy+}",
+  "path": "/path/to/resource",
+  "httpMethod": "POST",
+  "isBase64Encoded": false,
+  "queryStringParameters": {
+    "sheetId": "1BuIPRIkwt6egGEh_Ve81r9OYMCeX2yoIJwUz1KoTqSY"
+  }
+}
