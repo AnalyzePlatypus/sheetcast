@@ -1,6 +1,6 @@
 // require("isomorphic-fetch");
 
-const fs = require("fs");
+const zlib = require('zlib');
 
 const get = require('lodash.get');
 const AWS = require('aws-sdk');
@@ -89,7 +89,7 @@ exports.lambdaHandler = async function(event, context) {
     const feed = new Podcast({
       title: feedConfig.title,
       description: feedConfig.description,
-      generator: "Sheetcast",
+      generator: "Sheetcast: Google Sheet to Podcast",
       feedUrl:  feedConfig.feed_url,
       siteUrl: feedConfig.site_url,
       imageUrl: feedConfig.image_url,
@@ -99,7 +99,7 @@ exports.lambdaHandler = async function(event, context) {
       webMaster: feedConfig.web_master_name,
       copyright: feedConfig.copyright,
       language: feedConfig.language,
-      categories: feedConfig.categories,
+      categories: feedConfig.categories.split(", "),
       pubDate: new Date(),
       ttl: feedConfig.ttl || ONE_HOUR_IN_MINUTES,
       itunesAuthor: feedConfig.itunes_author,
@@ -110,9 +110,9 @@ exports.lambdaHandler = async function(event, context) {
         email: feedConfig.itunes_owner_email,
       },
       itunesExplicit: feedConfig.itunes_explicit,
-      itunesCategory: feedConfig.itunes_category,
+      itunesCategory: feedConfig.categories.split(", "),
       itunesImage: feedConfig.itunes_image_url,
-      itunesType: feedConfig.itunes_type
+      itunesType: feedConfig.itunes_type || "episodic"
     });
 
     const episodes = await episodesPromise;
@@ -128,6 +128,7 @@ exports.lambdaHandler = async function(event, context) {
           date: episode.date,
           enclosure : {
             url: episodeAudioUrl, 
+            length: episode.file_size_bytes,
             type: "audio/mpeg"
           },
           itunesExplicit: episode.is_explicit,
@@ -141,25 +142,27 @@ exports.lambdaHandler = async function(event, context) {
 
 
     
-    const xml = feed.buildXml("\t");
+    const xml = feed.buildXml("");
     console.log(xml);
 
     var s3Bucket = new AWS.S3( { params: { Bucket: process.env.S3_BUCKET_NAME } } );
 
+
     console.log("🌀 Uploading regenerated RSS file...");
     await uploadFile({
       s3Key: sheetId + ".rss",
-      s3Bucket,
       bucketName: process.env.S3_BUCKET_NAME,
-      fileContents: xml,
-      fileMimeType: "text/xml"
+      contentMimeType: 'text/xml',
+      fileContents: zlib.gzipSync(xml),
+      contentEncoding: 'gzip',
+      s3Bucket,
     })
     
-
     return {
       status: 200,
       body: `SheetID: ${sheetId} ${JSON.stringify(info)}`
     }
+    
   } catch (error) {
     console.error(error);
     return {

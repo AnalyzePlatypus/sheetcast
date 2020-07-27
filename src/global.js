@@ -82,12 +82,13 @@ async function respond(response, args, messageHash) {
 // ------
 
 
-async function uploadFile({s3Key, bucketName, fileContents, fileMimeType, s3Bucket}) {
+async function uploadFile({s3Key, bucketName, fileContents, contentMimeType, contentEncoding, s3Bucket}) {
   var uploadRequest = {
     Bucket: bucketName,
     Key: s3Key, 
     Body: fileContents,
-    ContentType: fileMimeType,
+    ContentType: contentMimeType,
+    ContentEncoding: contentEncoding,
     Tagging: buildTagString({})
   };
   console.log(`🌀 Uploading file "${s3Key}"`);
