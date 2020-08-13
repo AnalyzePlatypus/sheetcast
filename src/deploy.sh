@@ -1,7 +1,7 @@
 # Just in case we forgot to install a prod dep...
 ./npmDuo.sh i
 
-export $(egrep -v '^#' .prod.env | xargs)
+export $(egrep -v '^#' .env | xargs)
 
 echo $LAMBDA_FUNCTION_NAME
 rm function.zip 

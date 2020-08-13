@@ -24,6 +24,7 @@ Resources:
           S3_BUCKET_NAME: !Ref S3_BUCKET_NAME
           AWS_S3_REGION: !Ref AWS_S3_REGION
           SLACK_WEBHOOK_URL: !Ref SLACK_WEBHOOK_URL
+          RUN_LOCAL: !Ref RUN_LOCAL
       Policies:
         - AWSLambdaBasicExecutionRole
     

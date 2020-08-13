@@ -1,4 +1,4 @@
-// require("isomorphic-fetch");
+require("isomorphic-fetch");
 
 const zlib = require('zlib');
 
@@ -14,6 +14,8 @@ const REQUIRED_ENV_VARS = [
   "GOOGLE_API_CLIENT_EMAIL",
   "GOOGLE_API_PRIVATE_KEY",
   "S3_BUCKET_NAME",
+  "CLOUDFRONT_DISTRIBUTION_ID",
+  "CLOUDFRONT_PUBLIC_BASE_URL",
   "SLACK_WEBHOOK_URL"
 ]
 
@@ -45,15 +47,102 @@ const GOOGLE_DRIVE_LINK_TOKENS_TO_STRIP = [
 
 const ONE_HOUR_IN_MINUTES = 60;
 
-loadEnvVars("RegenerateFeed")
+const XML_PRETTY_PRINT_DELIMITER = "";
+
+function buildRssFeed(feedConfig, episodes) {
+  console.log(feedConfig);
+  console.log(feedConfig.title);
+  const feed = new Podcast({
+    title: feedConfig.title,
+    description: feedConfig.description,
+    generator: "Sheetcast: Google Sheet to Podcast",
+    feedUrl:  feedConfig.feed_url,
+    siteUrl: feedConfig.site_url,
+    imageUrl: feedConfig.image_url,
+    docs: feedConfig.docs_url,
+    author: feedConfig.author,
+    managingEditor: feedConfig.managing_editor_name,
+    webMaster: feedConfig.web_master_name,
+    copyright: feedConfig.copyright,
+    language: feedConfig.language,
+    categories: feedConfig.categories && feedConfig.categories.split(", "),
+    pubDate: new Date(),
+    ttl: feedConfig.ttl || ONE_HOUR_IN_MINUTES,
+    itunesAuthor: feedConfig.itunes_author,
+    itunesSubtitle: feedConfig.itunes_subtitle,
+    itunesSummary: feedConfig.itunes_summary,
+    itunesOwner: {
+      name: feedConfig.itunes_owner_name,
+      email: feedConfig.itunes_owner_email,
+    },
+    itunesExplicit: feedConfig.itunes_explicit,
+    itunesCategory: feedConfig.categories && feedConfig.categories.split(", ").map(category => { return {text: category}}),
+    itunesImage: feedConfig.itunes_image_url,
+    itunesType: feedConfig.itunes_type || "episodic"
+  });
+
+  console.log(feed);
+
+  if(episodes.length > 0) {
+    episodes.forEach(episode => {
+      let episodeAudioUrl = isGoogleDriveGUIUrl(episode.url) ? googleDriveGetFileUrl(episode.url) : episode.url;
+
+      if(feedConfig)
+
+      feed.addItem({
+        title: episode.title,
+        description: episode.showNotes,
+        url: episode.url, // link to the item
+        author: episode.guestAuthor, // optional - defaults to feed author property
+        date: episode.date,
+        enclosure : {
+          url: episodeAudioUrl, 
+          size: episode.file_size_bytes.replace(",", "")
+        },
+        itunesExplicit: episode.is_explicit,
+        itunesSubtitle: episode.subtitle,
+        itunesSummary: episode.summary,
+        itunesDuration: episode.duration,
+        itunesKeywords: episode.keywords,
+        itunesSeason:	episode.itunes_season_number,
+        itunesEpisode: episode.itunes_episode_number
+      })
+    })
+  }
+  return feed.buildXml(XML_PRETTY_PRINT_DELIMITER);
+} 
+
+async function triggerOvercastRecrawl(s3Key) {
+  console.log("🌀 Triggering Overcast recrawl...");
+  try {
+    const publicUrl = process.env.CLOUDFRONT_PUBLIC_BASE_URL + "/" + s3Key;
+    const overcastWebhooklUrl = "https://overcast.fm/ping?urlprefix=" + encodeURIComponent(publicUrl);
+    const response = await fetch(overcastWebhooklUrl);
+    const text = await response.text();
+    console.log(text);
+    if(!response.ok) throw {name: 'NonOKResponseError', responseCode: response.status, responseText: text};
+
+    console.log("✅ Overcast recrawl triggered");
+  } catch(e) {
+    throw {name: "OVERCAST_TRIGGER_RECRAWL_FAILED", error: e}
+  }
+}
 
 // Runtime
-validateEnvVars(REQUIRED_ENV_VARS);
+
+if(process.env.RUN_LOCAL) {
+  loadEnvVars("RegenerateFeed")
+}
+
 
 const credentials = { 
   GOOGLE_API_CLIENT_EMAIL: process.env.GOOGLE_API_CLIENT_EMAIL,
   GOOGLE_API_PRIVATE_KEY: process.env.GOOGLE_API_PRIVATE_KEY.replace(/\\n/g, "\n")
 }
+
+
+validateEnvVars(REQUIRED_ENV_VARS);
+
 
 exports.lambdaHandler = async function(event, context) {
   try {
@@ -75,92 +164,62 @@ exports.lambdaHandler = async function(event, context) {
     if(!feedConfigSheet) throw {name: "INVALID_SHEET", message: "Missing worksheet with required title 'feedConfig'"}
     if(!episodeSheet) throw {name: "INVALID_SHEET", message: "Missing worksheet with required title 'episodes'"}
 
-    console.log(feedConfigSheet.title);
-    console.log(episodeSheet.title);
-
     console.log("🌀 Loading sheet data...");
-    const promises = [feedConfigSheet.getRows(), episodeSheet.getRows()]
-    await Promise.all(promises);
-    const [feedConfigRows, episodesPromise] = promises;
+
+
+    const feedConfig = await feedConfigSheet.getRows();
+    const episodes = await episodeSheet.getRows();
+
     console.log("✅ Loaded sheet data");
-
-    const [feedConfig] = await feedConfigRows;
-
-    const feed = new Podcast({
-      title: feedConfig.title,
-      description: feedConfig.description,
-      generator: "Sheetcast: Google Sheet to Podcast",
-      feedUrl:  feedConfig.feed_url,
-      siteUrl: feedConfig.site_url,
-      imageUrl: feedConfig.image_url,
-      docs: feedConfig.docs_url,
-      author: feedConfig.author,
-      managingEditor: feedConfig.managing_editor_name,
-      webMaster: feedConfig.web_master_name,
-      copyright: feedConfig.copyright,
-      language: feedConfig.language,
-      categories: feedConfig.categories.split(", "),
-      pubDate: new Date(),
-      ttl: feedConfig.ttl || ONE_HOUR_IN_MINUTES,
-      itunesAuthor: feedConfig.itunes_author,
-      itunesSubtitle: feedConfig.itunes_subtitle,
-      itunesSummary: feedConfig.itunes_summary,
-      itunesOwner: {
-        name: feedConfig.itunes_owner_name,
-        email: feedConfig.itunes_owner_email,
-      },
-      itunesExplicit: feedConfig.itunes_explicit,
-      itunesCategory: feedConfig.categories.split(", "),
-      itunesImage: feedConfig.itunes_image_url,
-      itunesType: feedConfig.itunes_type || "episodic"
-    });
-
-    const episodes = await episodesPromise;
-
-    if(episodes.length > 0) {
-      episodes.forEach(episode => {
-        let episodeAudioUrl = isGoogleDriveGUIUrl(episode.url) ? googleDriveGetFileUrl(episode.url) : episode.url;
-        feed.addItem({
-          title: episode.title,
-          description: episode.showNotes,
-          url: episode.url, // link to the item
-          author: episode.guestAuthor, // optional - defaults to feed author property
-          date: episode.date,
-          enclosure : {
-            url: episodeAudioUrl, 
-            length: episode.file_size_bytes,
-            type: "audio/mpeg"
-          },
-          itunesExplicit: episode.is_explicit,
-          itunesSubtitle: episode.subtitle,
-          itunesSummary: episode.summary,
-          itunesDuration: episode.duration,
-          itunesKeywords: episode.keywords,
-        })
-      })
-    }
-
-
-    
-    const xml = feed.buildXml("");
-    console.log(xml);
+  
+    const xml = buildRssFeed(feedConfig[0], episodes)
 
     var s3Bucket = new AWS.S3( { params: { Bucket: process.env.S3_BUCKET_NAME } } );
-
+    const s3FileKey = sheetId + ".rss";
 
     console.log("🌀 Uploading regenerated RSS file...");
+
     await uploadFile({
-      s3Key: sheetId + ".rss",
+      s3Key: s3FileKey,
       bucketName: process.env.S3_BUCKET_NAME,
       contentMimeType: 'text/xml',
-      fileContents: zlib.gzipSync(xml),
-      contentEncoding: 'gzip',
+      fileContents: xml,
       s3Bucket,
     })
+
+    // Note - using a timestamp as a CallerReference defeats the Cloudfront 
+    // anti-duplicate request preventer. As this will be called infrequently,
+    // but will occasionally be called several times in rapid succession, it seems necessary to let every invalidation go through.
+    // See https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_CreateInvalidation.html#API_CreateInvalidation_RequestSyntax
+    const invalidationUniqueId = new Date().getTime().toString();
+
+    var options = {
+      DistributionId: process.env.CLOUDFRONT_DISTRIBUTION_ID,
+      InvalidationBatch: { 
+        CallerReference: invalidationUniqueId,
+        Paths: {
+          Quantity: 1,
+          Items: [
+             "/" + s3FileKey
+          ]
+        }
+      }
+    };
+
+    console.log(options);
+
+    console.log("🌀 Invalidating CDN...");
+    var cloudfront = new AWS.CloudFront();
+    await cloudfront.createInvalidation(options).promise();
+    console.log("✅ Invalidated");
+
+    await triggerOvercastRecrawl(s3FileKey);
+
+    await sendSlackNotification("🚀 Podcast feed regenerated");
     
     return {
       status: 200,
-      body: `SheetID: ${sheetId} ${JSON.stringify(info)}`
+      body: `Regenerateed feed for SheetID: ${sheetId}`
     }
     
   } catch (error) {
@@ -172,6 +231,7 @@ exports.lambdaHandler = async function(event, context) {
   }
 };
 
-
-const event = readJSONFile("../events/event.json");
-const results = exports.lambdaHandler(event);
+if(process.env.RUN_LOCAL) {
+  const event = readJSONFile("../events/event.json");
+  const results = exports.lambdaHandler(event);
+}

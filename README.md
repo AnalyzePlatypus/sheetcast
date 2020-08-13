@@ -54,7 +54,7 @@ Create and populate `.env.json` with these values:
 }
 ```
 
-> The bucket should allow public `getObject`, so the RSS files will be public, but should not allow any other actions to prevent enumeration of the bucket contents. (The 44-character alphanumeric Sheets ID used for the RSS file name has 7.3 quadrillion possible values. Good luck, blackhats 😎!)
+> The bucket should allow public `getObject`, so the RSS files will be public, but should not allow any other actions to prevent enumeration of the bucket contents. (The 44-character alphanumeric Sheets ID used for the RSS file name has 7.3 quadrillion (e+78) possible values. Good luck, blackhats 😎!)
 
 ## Deployment
 
@@ -105,7 +105,8 @@ title	url	duration	guestAuthor	is_explicit	subtitle	summary	showNotes	date	keywo
 
 ## Roadmap
 
-- [x] `gzip` of RSS feed
+- [x] `gzip` of RSS feed - Turns out iTunes will not validate GZIPed feeds
+- [x] iTunes compliance
 - [ ] Auto-regenerate the RSS feed when the Sheet is edited (https://developers.google.com/drive/api/v3/push)
 - [ ] Analytics rewriting
 - [ ] Cloudfront/Clouflare caching and invalidation

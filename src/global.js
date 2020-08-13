@@ -1,3 +1,5 @@
+require("isomorphic-fetch");
+
 const AWS = require('aws-sdk');
 
 const fs  = require("fs");
