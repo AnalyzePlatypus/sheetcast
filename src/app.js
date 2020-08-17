@@ -5,7 +5,7 @@ const zlib = require('zlib');
 const get = require('lodash.get');
 const AWS = require('aws-sdk');
 
-const { respond, readJSONFile, loadEnvVars, uploadFile, asyncForEach, validateEnvVars, sendSlackNotification } = require("./global.js");
+const { respond, readJSONFile, loadEnvVars, uploadFile, asyncForEach, parseBoolean, validateEnvVars, sendSlackNotification } = require("./global.js");
 const { getSheet } = require("./sheets.js");
 
 const Podcast =  require('podcast');
@@ -75,10 +75,11 @@ function buildRssFeed(feedConfig, episodes) {
       name: feedConfig.itunes_owner_name,
       email: feedConfig.itunes_owner_email,
     },
-    itunesExplicit: feedConfig.itunes_explicit,
+    itunesExplicit: parseBoolean(feedConfig.itunes_explicit),
     itunesCategory: feedConfig.categories && feedConfig.categories.split(", ").map(category => { return {text: category}}),
     itunesImage: feedConfig.itunes_image_url,
-    itunesType: feedConfig.itunes_type || "episodic"
+    itunesType: feedConfig.itunes_type || "episodic",
+    customElements: [ { 'itunes:block': feedConfig.is_private_feed || 'no' }
   });
 
   console.log(feed);
@@ -99,7 +100,7 @@ function buildRssFeed(feedConfig, episodes) {
           url: episodeAudioUrl, 
           size: episode.file_size_bytes.replace(",", "")
         },
-        itunesExplicit: episode.is_explicit,
+        itunesExplicit: parseBoolean(episode.is_explicit),
         itunesSubtitle: episode.subtitle,
         itunesSummary: episode.summary,
         itunesDuration: episode.duration,
@@ -153,7 +154,13 @@ exports.lambdaHandler = async function(event, context) {
       message: `Missing required query param "sheetId". (Got "${sheetId}")`
     }
 
-    const doc = await getSheet(sheetId, credentials);
+    let doc;
+    // try {
+      doc = await getSheet(sheetId, credentials);
+    // } catch(e) {
+    //   if(e.name = "Non")
+    // }
+   
     const info = await doc.getInfo();
     console.log(doc.title);
 
@@ -187,6 +194,8 @@ exports.lambdaHandler = async function(event, context) {
       s3Bucket,
     })
 
+    console.log("✅ Upload complete");
+
     // Note - using a timestamp as a CallerReference defeats the Cloudfront 
     // anti-duplicate request preventer. As this will be called infrequently,
     // but will occasionally be called several times in rapid succession, it seems necessary to let every invalidation go through.
@@ -217,9 +226,14 @@ exports.lambdaHandler = async function(event, context) {
 
     await sendSlackNotification("🚀 Podcast feed regenerated");
     
+    const publicCdnUrl = process.env.CLOUDFRONT_PUBLIC_BASE_URL + "/" + s3Key;
+
     return {
       status: 200,
-      body: `Regenerateed feed for SheetID: ${sheetId}`
+      body: {
+        publicFeedUrl: publicCdnUrl,
+        message: `Regenerateed feed for SheetID: ${sheetId}`
+      }
     }
     
   } catch (error) {

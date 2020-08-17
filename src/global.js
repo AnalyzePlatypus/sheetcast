@@ -35,7 +35,9 @@ function parseBoolean(str) {
   if (typeof str === "boolean") return str;
   const normalized = normalizeToken(str);
   if (normalized == 'true') return true;
+  if (normalized == 'yes') return true;
   if (normalized == 'false') return false;
+  if (normalized == 'no') return true;
   throw `parseBoolean failed. Unable to convert string "${str}" to Boolean.`;
 }
 
