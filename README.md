@@ -109,4 +109,6 @@ title	url	duration	guestAuthor	is_explicit	subtitle	summary	showNotes	date	keywo
 - [x] iTunes compliance
 - [ ] Auto-regenerate the RSS feed when the Sheet is edited (https://developers.google.com/drive/api/v3/push)
 - [ ] Analytics rewriting
-- [ ] Cloudfront/Clouflare caching and invalidation
+- [x] Cache feeds in Cloudfront and invalidate when feed is regenerated
+- [x] Ping Overcast servers to re-crawl the regenerated fresh by b
+
