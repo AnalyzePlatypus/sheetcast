@@ -79,7 +79,7 @@ function buildRssFeed(feedConfig, episodes) {
     itunesCategory: feedConfig.categories && feedConfig.categories.split(", ").map(category => { return {text: category}}),
     itunesImage: feedConfig.itunes_image_url,
     itunesType: feedConfig.itunes_type || "episodic",
-    customElements: [ { 'itunes:block': feedConfig.is_private_feed || 'no' }
+    customElements: [ { 'itunes:block': feedConfig.is_private_feed || 'no' }]
   });
 
   console.log(feed);
@@ -159,7 +159,7 @@ exports.lambdaHandler = async function(event, context) {
       doc = await getSheet(sheetId, credentials);
     // } catch(e) {
     //   if(e.name = "Non")
-    // }
+    // }x
    
     const info = await doc.getInfo();
     console.log(doc.title);
@@ -224,9 +224,9 @@ exports.lambdaHandler = async function(event, context) {
 
     await triggerOvercastRecrawl(s3FileKey);
 
-    await sendSlackNotification("🚀 Podcast feed regenerated");
+    await sendSlackNotification(`🚀 Regenerated "${doc.title}" (${episodes.length} episodes)`);
     
-    const publicCdnUrl = process.env.CLOUDFRONT_PUBLIC_BASE_URL + "/" + s3Key;
+    const publicCdnUrl = process.env.CLOUDFRONT_PUBLIC_BASE_URL + "/" + s3FileKey;
 
     return {
       status: 200,
@@ -238,6 +238,7 @@ exports.lambdaHandler = async function(event, context) {
     
   } catch (error) {
     console.error(error);
+    await sendSlackNotification(error);
     return {
       status: 500,
       message: JSON.stringify(error)

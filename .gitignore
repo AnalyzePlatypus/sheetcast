@@ -3,3 +3,6 @@ node_modules__prod
 node_modules__stash_while_installing
 .env
 .env.json
+function.zip
+src/function.zip
+.DS_Store
