@@ -1,3 +1,5 @@
+//process.env.RUN_LOCAL = true;
+
 require("isomorphic-fetch");
 
 const zlib = require('zlib');
@@ -42,7 +44,8 @@ const GOOGLE_DRIVE_LINK_TOKENS_TO_STRIP = [
   "https://",
   "drive.google.com/open?id=",
   "drive.google.com/file/d/",
-  "/view?usp=sharing"
+  "/view?usp=sharing",
+  "/view?usp=drive_web"
 ]
 
 const ONE_HOUR_IN_MINUTES = 60;
@@ -245,6 +248,8 @@ exports.lambdaHandler = async function(event, context) {
     }
   }
 };
+
+
 
 if(process.env.RUN_LOCAL) {
   const event = readJSONFile("../events/event.json");

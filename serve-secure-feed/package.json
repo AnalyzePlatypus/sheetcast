@@ -1,0 +1,13 @@
+{
+    "name": "sheetcast-serve-secure-feed",
+    "description": "Lambda@Edge function for serving a sheetcast feed",
+    "version": "0.0.1",
+    "private": true,
+    "devDependencies": {
+        "aws-sdk": "^2.799.0",
+        "jest": "^24.7.1"
+    },
+    "scripts": {
+        "test": "jest"
+    }
+}
