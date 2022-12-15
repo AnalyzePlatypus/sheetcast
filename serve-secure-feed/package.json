@@ -5,7 +5,7 @@
     "private": true,
     "devDependencies": {
         "aws-sdk": "^2.814.0",
-        "jest": "^24.7.1"
+        "jest": "^29.3.1"
     },
     "scripts": {
         "test": "jest"
